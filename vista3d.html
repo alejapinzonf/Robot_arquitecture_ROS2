@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Vista 3D del reto HRI de AndesRobot en la arena 2026: el robot, los invitados y los mensajes ROS 2 de cada paso.">
+<title>AndesRobot 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: app de una pantalla. Escena 3D de la arena a la izquierda (lo protagonista), panel del paso a la derecha,
+   controles del reto debajo de la escena. En teléfono se apilan: escena, controles, panel. Mismos tokens que la página principal. */
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --sunk:#eceef3;
+  --ink:#15171c; --ink-2:#4a5061; --ink-3:#7b8193; --line:#dcdfe6; --line-2:#c3c8d3;
+  --brand:#6a2c9e; --brand-soft:#f0e7f8;
+  --k-topic:#1b84b8; --k-srv:#b86e06; --k-act:#b8306f;
+  --t-hri:#6a2c9e; --t-vis:#0e7f78; --t-nav:#2a5fc4; --t-arm:#b35a10; --t-base:#5a6474;
+  --ok:#2f8a4e; --bad:#c23a2b;
+  --scene-bg:#e7e9ee; --floor:#efdfc2; --wall:#2b2d33; --outside:#d3d6dd; --furn:#f6f6f4; --furn-dark:#3b3a3c; --wood:#8a5a3b;
+  --f-disp:"Archivo", "Arial Narrow", Arial, sans-serif;
+  --f-body:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e1015; --panel:#161920; --sunk:#1c2029;
+  --ink:#e9ebf1; --ink-2:#aab0be; --ink-3:#7f8597; --line:#2a2f3b; --line-2:#3a4150;
+  --brand:#bb8ff0; --brand-soft:#2a1f3a;
+  --k-topic:#55b9e8; --k-srv:#e6a74a; --k-act:#ec6fa9;
+  --t-hri:#bb8ff0; --t-vis:#3fc3b9; --t-nav:#729ff3; --t-arm:#ec9a55; --t-base:#9ea7b7;
+  --ok:#5cc47f; --bad:#ef6a5a;
+  --scene-bg:#12151b; --floor:#8f826c; --wall:#1d1f24; --outside:#2a2e37; --furn:#c9c9c4; --furn-dark:#2d2c2e; --wood:#6e4a33;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0e1015; --panel:#161920; --sunk:#1c2029;
+  --ink:#e9ebf1; --ink-2:#aab0be; --ink-3:#7f8597; --line:#2a2f3b; --line-2:#3a4150;
+  --brand:#bb8ff0; --brand-soft:#2a1f3a;
+  --k-topic:#55b9e8; --k-srv:#e6a74a; --k-act:#ec6fa9;
+  --t-hri:#bb8ff0; --t-vis:#3fc3b9; --t-nav:#729ff3; --t-arm:#ec9a55; --t-base:#9ea7b7;
+  --ok:#5cc47f; --bad:#ef6a5a;
+  --scene-bg:#12151b; --floor:#8f826c; --wall:#1d1f24; --outside:#2a2e37; --furn:#c9c9c4; --furn-dark:#2d2c2e; --wood:#6e4a33;
+  color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+code{font-family:var(--f-mono);font-size:.88em}
+h1,h2,h3{font-family:var(--f-disp);margin:0;text-wrap:balance}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);padding-inline:16px;gap:12px;padding-block:12px}
+.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
+.mark{font-family:var(--f-disp);font-weight:760;font-stretch:80%;font-size:18px;white-space:nowrap}
+.mark span{color:var(--brand)}
+.top .sub{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.top .grow{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.back{font-size:13px;color:var(--brand);text-decoration:none;border:1px solid var(--line-2);border-radius:8px;padding:6px 11px;background:var(--panel)}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;min-height:0}
+.stage{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px;min-height:0;min-width:0}
+.view{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scene-bg);min-height:280px}
+#c{display:block;width:100%;height:100%}
+.hud{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 20px)}
+.hud button{font-size:12px;border:1px solid var(--line-2);background:color-mix(in srgb,var(--panel) 88%,transparent);border-radius:999px;padding:5px 10px;cursor:pointer;color:var(--ink-2);backdrop-filter:blur(6px)}
+.hud button[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.legend3{position:absolute;right:10px;bottom:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;font-size:11.5px;color:var(--ink-2);background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:5px 9px;backdrop-filter:blur(6px);max-width:calc(100% - 20px)}
+.legend3 i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.err{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--ink-2)}
+.ctl{display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line-2);background:var(--panel);border-radius:8px;padding:7px 13px;cursor:pointer;font-size:13.5px}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;min-width:108px}
+.row .grow{flex:1}
+select{border:1px solid var(--line-2);background:var(--panel);border-radius:7px;padding:6px 8px;font-size:13px}
+#scrub{flex:1;min-width:120px;accent-color:var(--brand)}
+output{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills button{font-size:12.5px;border:1px solid var(--line);background:var(--sunk);border-radius:999px;padding:4px 10px;cursor:pointer;color:var(--ink-2)}
+.pills button.on,.pills button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.pills .lbl{font-size:12px;color:var(--ink-3);align-self:center}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.meta{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.meta .ph{color:var(--brand);font-weight:600}
+.meta .n{margin-left:auto;font-variant-numeric:tabular-nums}
+.brtag{font-family:var(--f-mono);font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--brand);color:#fff;letter-spacing:0;text-transform:none}
+.side h2{font-size:22px;font-stretch:80%;line-height:1.2}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1;padding:5px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2)}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--tc)}
+.team-hri{--tc:var(--t-hri)} .team-vis{--tc:var(--t-vis)} .team-nav{--tc:var(--t-nav)} .team-arm{--tc:var(--t-arm)} .team-base{--tc:var(--t-base)}
+.speech{display:grid;gap:6px}
+.speech p{margin:0;font-size:14.5px;padding:8px 12px;border-radius:8px;background:var(--sunk)}
+.speech b{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-right:6px}
+.speech .r{border-left:3px solid var(--brand)} .speech .h{border-left:3px solid var(--k-topic)}
+.note{margin:0;font-size:13.5px;color:var(--ink-2)}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.tabs button{font-size:12.5px;border:1px solid var(--line-2);background:var(--panel);border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--ink-2)}
+.tabs button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.why{margin:0;font-size:14px;line-height:1.55;color:var(--ink-2);padding:10px 12px;border-radius:8px;background:var(--sunk);border-left:3px solid var(--brand)}
+.why b{color:var(--ink)}
+.msgs{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.msgs li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;align-items:baseline;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.msgs code{font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.msgs .fl{grid-column:2;font-size:12px;color:var(--ink-3);overflow-wrap:anywhere}
+.kind{font-family:var(--f-mono);font-size:10.5px;padding:2px 6px;border-radius:4px;border:1px solid currentColor;text-transform:uppercase;letter-spacing:.04em}
+.kind.topic{color:var(--k-topic)} .kind.service{color:var(--k-srv)} .kind.action{color:var(--k-act)} .kind.internal{color:var(--ink-3)}
+@media (max-width:560px){ .legend3{display:none} }
+@media (max-width:900px){
+  .app{height:auto;grid-template-rows:auto auto}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .view{height:58vh}
+  .side{overflow:visible}
+}
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
+</style>
+
+
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <span class="mark">Andes<span>Robot</span></span>
+    <span class="sub">Reto HRI · vista 3D de la arena</span>
+    <span class="grow"></span>
+    <div class="seg" role="group" aria-label="Robot">
+      <button type="button" id="rMilo" aria-pressed="true">MILO</button>
+      <button type="button" id="rMartha" aria-pressed="false">MARTHA</button>
+    </div>
+    <a class="back" id="back" href="./" hidden>← Arquitectura completa</a>
+  </div>
+  <div class="main">
+    <div class="stage">
+      <div class="view" id="view">
+        <canvas id="c" aria-label="Arena en 3D con el robot, los invitados, el anfitrión y el bolso en el paso actual"></canvas>
+        <div class="hud" role="group" aria-label="Cámara y capas">
+          <button type="button" data-cam="general" aria-pressed="true">Vista general</button>
+          <button type="button" data-cam="top" aria-pressed="false">Desde arriba</button>
+          <button type="button" data-cam="follow" aria-pressed="false">Seguir al robot</button>
+          <button type="button" id="tLidar" aria-pressed="false">LiDAR</button>
+          <button type="button" id="tGaze" aria-pressed="true">Mirada</button>
+        </div>
+        <div class="legend3">
+          <span><i style="background:var(--brand)"></i>Robot</span>
+          <span><i style="background:#2f7fd1"></i>Invitado 1</span>
+          <span><i style="background:#2f9e6a"></i>Invitado 2</span>
+          <span><i style="background:#d07a2a"></i>Anfitrión</span>
+          <span><i style="background:#8d93a1"></i>Otra persona</span>
+        </div>
+        <div class="err" id="err" hidden><p>No se pudo cargar el motor 3D (three.js). Revisa la conexión a internet y recarga la página.</p></div>
+      </div>
+      <div class="ctl">
+        <div class="row">
+          <button class="btn" id="prev" type="button">Anterior</button>
+          <button class="btn primary" id="play" type="button">Reproducir</button>
+          <button class="btn" id="next" type="button">Siguiente</button>
+          <span class="grow"></span>
+          <label for="speed" style="font-size:13px;color:var(--ink-2)">Velocidad</label>
+          <select id="speed"><option value="0.6">0,6×</option><option value="1" selected>1×</option><option value="1.6">1,6×</option><option value="2.4">2,4×</option></select>
+        </div>
+        <div class="row"><input id="scrub" type="range" min="0" max="10" value="0" aria-label="Paso del reto"><output id="scrubOut">1 / 1</output></div>
+        <div class="pills" id="phases"></div>
+        <div class="pills" id="branch" role="group" aria-label="Llegada del invitado"><span class="lbl">Llegada del invitado:</span></div>
+      </div>
+    </div>
+    <aside class="side" id="side" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+var DATA = {"phases": ["Llegada", "Invitado 1", "Invitado 2", "Presentaciones", "Bolso y anfitrión"], "br": {"timbre": "A · timbre", "boton": "B · botón", "ninguno": "C · ninguno", "dos": "D · los dos"}, "teams": {"hri": "Interacción Humano-Robot", "vis": "Visión Computacional", "nav": "Navegación", "arm": "Brazo y Garra", "base": "Estructura y Electrónica", "hw": "Hardware"}, "steps": [{"t": "Ubicar al robot en la entrada y decirle dónde está", "ph": 0, "tz": "L1", "br": "", "set": {"robot": "doorIn", "g1": null, "g2": null, "host": "S2", "bag": null, "door": "open"}, "look": "seatView", "point": "", "say": "", "reply": "", "note": "El equipo deja al robot en la entrada (dentro de la arena) y lo enciende. Lo primero es decirle a Navegación dónde está: <code>task_orchestrator_node<\/code> llama a <code>/nav/set_initial_pose<\/code> con la pose de la entrada guardada en el yaml.", "why": "Al encender, el robot no sabe dónde está en el mapa. Antes de moverse, el orquestador le dice a Navegación la pose de la entrada con <code>/nav/set_initial_pose<\/code> (la toma del yaml) y la localización se ajusta con el LiDAR. Sin esto, la primera navegación sale para cualquier lado.", "teams": ["hri", "nav"], "msgs": [["/nav/set_initial_pose", "service", "task_orchestrator_node", "localization_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/nav/pose", "topic", "localization_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Inicio de la prueba: el árbitro da la señal", "ph": 0, "tz": "0", "br": "", "set": {}, "look": "seatView", "point": "", "say": "Estoy listo. Presiona el botón verde para empezar.", "reply": "", "note": "El botón se usa una vez para <b>empezar la prueba<\/b>: <code>start_sound_node<\/code> (Estructura) publica <code>/base/start_sound<\/code>. Desde aquí corre el reloj de 7:00 y el robot va hacia su punto inicial.", "why": "El reglamento exige una señal de inicio manual cuando la prueba no empieza abriendo la puerta de la arena (3.6.8). El robot avisa que está listo y dice qué hacer: \"Estoy listo. Presiona el botón verde para empezar\". El árbitro lo presiona y <code>start_sound_node<\/code> publica <code>/base/start_sound<\/code>. Desde ese momento corre el reloj de 7:00 y el robot sale hacia su punto inicial.", "teams": ["base", "hri"], "msgs": [["/base/start_sound", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": false, "button": true, "wait": false, "start": true, "both": false, "moves": []}, {"t": "Ir de la puerta a su zona base", "ph": 0, "tz": "L2", "br": "", "set": {"robot": "start"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "La idea del equipo: dejar el robot en la puerta y que él solo llegue a la zona que le digamos que es su base. La zona va en el yaml (<code>base_zone<\/code>: centro, orientación y radio) y el orquestador pide ir a su centro con <code>/nav/navigate_to_pose<\/code>, igual que cualquier otra meta.", "why": "El equipo deja el robot en la puerta y el robot llega solo a la zona que le asignamos como base. El timbre solo suena si el robot está esperando en la posición inicial, así que esa zona es la posición inicial que anuncian los organizadores (al menos dos horas antes). El orquestador pide ir al centro de la zona con <code>/nav/navigate_to_pose<\/code>: Navegación calcula la ruta y la velocidad, y Estructura mueve las ruedas (ver \"Cómo se mueve el robot\").", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Llegar y quedar listo en su zona base", "ph": 0, "tz": "L3", "br": "", "set": {"door": "closed"}, "look": "door", "point": "", "say": "Listo, estoy esperando a los invitados.", "reply": "", "note": "Confirma que quedó dentro de la zona (por ejemplo, a menos de 0,3 m del centro), se gira hacia la puerta, pone la luz en \"escuchando\" y avisa. Recién aquí empieza la espera del timbre.", "why": "El robot confirma que quedó dentro de su zona, se gira hacia la puerta, pone la luz en \"escuchando\" y avisa en voz alta que está listo. Desde aquí el orquestador pasa a ESPERANDO_INVITADO.", "teams": ["nav", "hri", "base"], "msgs": [["/nav/pose", "topic", "localization_node", "task_orchestrator_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"], ["/base/set_led_state", "service", "task_orchestrator_node", "led_node"], ["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Esperar en el punto de inicio: ¿qué llega?", "ph": 1, "tz": "1", "br": "", "set": {"g1": "outside"}, "look": "", "point": "", "say": "", "reply": "", "note": "El orquestador escucha <b>los dos caminos a la vez<\/b>: el timbre (<code>/hri/doorbell_detected<\/code>, Interacción, que maneja el micrófono) y el botón (<code>/base/start_button<\/code>, Estructura). Pueden llegar uno, el otro, ninguno o los dos: los pasos 1A, 1B, 1C y 1D muestran cada caso (en la animación, con los botones A, B, C y D). Lo que llega primero decide.", "why": "El timbre solo suena si el robot está esperando en la posición inicial, y para sumar los 2×30 tiene que reaccionar al instante. Por eso el robot se queda quieto y escucha los dos caminos al mismo tiempo: el audio que Interacción analiza y el botón que lee Estructura.", "teams": ["hri", "base"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"], ["/base/start_button", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": true, "start": false, "both": false, "moves": []}, {"t": "Rama A · Llega el timbre", "ph": 1, "tz": "1A", "br": "timbre", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "<b>Si llega el timbre:<\/b> <code>doorbell_detector_node<\/code> (Interacción) lo reconoce en <code>/hri/audio<\/code> y publica <code>/hri/doorbell_detected<\/code>. El orquestador arranca de inmediato hacia la puerta y suma los 2×30. Desde ese momento ignora el botón para este invitado.", "why": "Es la rama que más suma: +2×30. El reglamento dice que el timbre solo cuenta si el robot está en la posición inicial y reacciona al instante, por eso el orquestador sale hacia la puerta apenas llega <code>/hri/doorbell_detected<\/code>, sin esperar nada más.", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"], ["/hri/doorbell_detected", "topic", "doorbell_detector_node", "task_orchestrator_node"]], "bell": true, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Rama B · Llega el botón", "ph": 1, "tz": "1B", "br": "boton", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "<b>Si llega el botón:<\/b> Interacción no detectó el timbre, alguien presiona el botón de inicio y <code>start_sound_node<\/code> (Estructura) publica <code>/base/start_button<\/code>. El orquestador va a la puerta igual. Solo se pierden los 2×30 del timbre; todo lo demás se puntúa igual. Si después llega un timbre tarde, se ignora.", "why": "Sirve si Interacción no alcanzó a detectar el timbre. El robot sale a la puerta igual y todo lo que sigue se puntúa normal. Solo se pierden los 2×30.", "teams": ["base", "hri"], "msgs": [["/base/start_button", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": false, "button": true, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Rama C · No llega ninguno", "ph": 1, "tz": "1C", "br": "ninguno", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "<b>Si no llega ninguno:<\/b> pasa el tiempo límite (por ejemplo 10 s, parámetro del orquestador) sin timbre ni botón. El robot va a la puerta solo, lo que el reglamento permite (\"waiting for the doorbell is optional\"). Igual que la rama B, solo se pierden los 2×30.", "why": "El reglamento dice textualmente que esperar el timbre es opcional: el robot puede ir directo a la puerta. Por eso nunca se queda esperando para siempre: vence el tiempo límite y sale solo. Así no se arriesga a perder tiempo de los 7:00 ni a que lo saquen por inactividad.", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"]], "bell": false, "button": false, "wait": true, "start": false, "both": false, "moves": []}, {"t": "Rama D · Llegan los dos", "ph": 1, "tz": "1D", "br": "dos", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "<b>Si llegan los dos<\/b> (por ejemplo, suena el timbre y además alguien presiona el botón): el orquestador sigue con el <b>primero<\/b> que llega y solo registra el segundo. El robot sale una sola vez hacia la puerta.", "why": "Puede pasar que el árbitro presione el botón y también suene el timbre, o al revés. El orquestador sigue con <b>lo primero que llega<\/b> y el otro aviso solo se registra. Así el robot nunca arranca dos veces hacia la puerta.", "teams": ["hri", "base"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"], ["/hri/doorbell_detected", "topic", "doorbell_detector_node", "task_orchestrator_node"], ["/base/start_button", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": true, "button": false, "wait": false, "start": false, "both": true, "moves": []}, {"t": "Ir desde el punto de inicio a la entrada", "ph": 1, "tz": "2", "br": "", "set": {"robot": "doorIn"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "Aquí se unen las tres ramas: desde este paso todo es igual, llegue el timbre, el botón o ninguno. El líder pide la puerta cerrada para poder sumar los 2×200 de abrirla.", "why": "El invitado espera en la puerta y no entra hasta que el robot inicie la conversación. El robot es quien tiene que acercarse. De paso suma 2×15 si mira hacia donde navega.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Revisar si la puerta está cerrada", "ph": 1, "tz": "nuevo", "br": "", "set": {}, "look": "door", "point": "", "say": "", "reply": "", "note": "Primero Navegación responde con el LiDAR si la puerta está cerrada y dónde está (<code>/nav/detect_door<\/code>). Si está abierta, se saltan los pasos de la chapa y de abrir.", "why": "Abrir la puerta vale 2×200, el ítem más grande del reto. La puerta está abierta por defecto y el líder puede pedir que la cierren. Lo primero es saber si está cerrada y dónde está: eso lo ve Navegación con el LiDAR.", "teams": ["nav", "hri"], "msgs": [["/nav/scan", "topic", "nav_drivers", "door_detector_node"], ["/nav/detect_door", "service", "task_orchestrator_node", "door_detector_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Mover la garra para mirar la puerta", "ph": 1, "tz": "nuevo", "br": "", "set": {}, "look": "door", "point": "door", "say": "", "reply": "", "note": "Para que Visión vea la chapa, primero hay que <b>activar la garra<\/b>: el orquestador le pide a Brazo y Garra la pose <code>look_door<\/code> con <code>/arm/move_to_pose<\/code> (o que apunte la cámara a la puerta que encontró Navegación). El brazo y el ascensor ponen la cámara de la garra frente a la puerta, a la altura de la chapa.", "why": "La cámara que puede medir la chapa en 3D está en la garra (en MILO es la única con profundidad). Para que Visión la vea, primero hay que <b>activar el brazo<\/b> y ponerlo mirando la puerta. Lo pide el orquestador con <code>/arm/move_to_pose<\/code>: una pose con nombre (<code>look_door<\/code>) o \"apunta la cámara a este punto\" con la pose de la puerta que dio Navegación.", "teams": ["hri", "arm", "base"], "msgs": [["/arm/move_to_pose", "action", "task_orchestrator_node", "arm_controller_node"], ["/arm/joint_states", "topic", "arm_controller_node", "robot_state_publisher"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Buscar la chapa con la cámara de la garra", "ph": 1, "tz": "nuevo", "br": "", "set": {}, "look": "door", "point": "door", "say": "", "reply": "", "note": "Con la cámara ya frente a la puerta, Visión busca la chapa (<code>/vision/detect_handle<\/code>) y responde dónde está y de qué tipo es. La pose sale en el frame de la cámara de la garra con la hora de la imagen.", "why": "Con la cámara ya frente a la puerta, Visión encuentra la chapa y responde dónde está y de qué tipo es (palanca, pomo o barra). Con eso el orquestador sabe qué pedirle al brazo.", "teams": ["vis", "hri"], "msgs": [["/vision/gripper_camera/color", "topic", "camera_driver_node", "object_detector_node"], ["/vision/gripper_camera/depth", "topic", "camera_driver_node", "object_detector_node"], ["/vision/detect_handle", "service", "task_orchestrator_node", "object_detector_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Abrir la puerta", "ph": 1, "tz": "nuevo", "br": "", "set": {"door": "open"}, "look": "door", "point": "", "say": "", "reply": "", "note": "La garra abre la puerta con la chapa que encontró Visión: el orquestador le pasa <code>handle_pose<\/code> a <code>/arm/open_door<\/code> y, mientras se acerca, Brazo y Garra corrige con lo que Visión ve en la cámara de la garra (<code>/vision/gripper_objects<\/code>). Si la base tiene que moverse, lo pide el orquestador a Navegación. Si falla, el robot le pide al árbitro que abra: no suma, pero la prueba sigue.", "why": "Ahora la garra abre la puerta. El orquestador le pasa la chapa que encontró Visión a Brazo y Garra con <code>/arm/open_door<\/code>. Mientras se acerca, el brazo corrige con lo que Visión sigue viendo en la cámara de la garra (<code>/vision/gripper_objects<\/code>), porque la pose inicial nunca es exacta. Visión dice dónde está la chapa; Brazo y Garra decide cómo moverse.", "teams": ["hri", "arm", "vis", "nav", "base"], "msgs": [["/arm/open_door", "action", "task_orchestrator_node", "arm_controller_node"], ["/vision/gripper_camera/color", "topic", "camera_driver_node", "object_detector_node"], ["/vision/gripper_objects", "topic", "object_detector_node", "arm_controller_node"], ["plan de agarre", "internal", "arm_controller_node", "grasp_planner_node"], ["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Detectar a la persona", "ph": 1, "tz": "3", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "El invitado espera afuera y no entra hasta que el robot inicie la conversación. El robot es quien se acerca.", "why": "Antes de hablar, el robot tiene que saber dónde está el invitado para mirarlo y para no hablarle a otra persona. Visión publica todas las personas que ve, con su posición y postura.", "teams": ["vis", "hri"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/camera/depth", "topic", "camera_driver_node", "person_detector_node"], ["/vision/persons", "topic", "person_detector_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Mirar a la persona", "ph": 1, "tz": "4", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "El invitado se mueve un poco a los lados: la mirada lo sigue de forma continua (<code>continuous = true<\/code>).", "why": "Mirar a la persona que habla vale 2×50 y solo cuenta si la sigue de forma continua: el invitado se mueve un poco a los lados a propósito para comprobarlo.", "teams": ["vis", "nav", "hri", "base"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/gaze", "topic", "person_detector_node", "look_controller_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Saludar a la persona", "ph": 1, "tz": "5", "br": "", "set": {}, "look": "g1", "point": "", "say": "¡Hola! Bienvenido a la fiesta.", "reply": "", "note": "", "why": "Iniciar la conversación es lo que habilita al invitado a moverse. El orquestador pide un diálogo con <code>/hri/converse<\/code> y <code>dialogue_manager_node<\/code> arma la frase.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Preguntar el nombre", "ph": 1, "tz": "6", "br": "", "set": {}, "look": "g1", "point": "", "say": "¿Cómo te llamas?", "reply": "Charlie.", "note": "Nada de \"¿Dijiste Charlie?\". Pedir que repita solo si no se escuchó.", "why": "El nombre es el dato principal del invitado. Si lo entiende sin preguntas de confirmación, suma 4×15 al final.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"], ["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Recordar a la persona", "ph": 1, "tz": "7", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "Guarda la cara y un atributo visual (por ejemplo, camisa roja) para contárselo después al invitado 2.", "why": "El robot guarda la cara para reconocer al invitado después (pueden cambiarse de asiento) y un atributo visual para contárselo al invitado 2 (4×20).", "teams": ["vis", "hri"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "face_recognition_node"], ["/vision/faces", "topic", "face_recognition_node", "task_orchestrator_node"], ["/vision/describe_person", "service", "task_orchestrator_node", "face_recognition_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Asociar el nombre a la persona", "ph": 1, "tz": "8", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "Memorizar mal un nombre o una bebida resta 40.", "why": "Guardar el nombre junto al <code>person_id<\/code> permite presentarlo después sin volver a preguntar.", "teams": ["hri"], "msgs": [["/hri/remember", "service", "task_orchestrator_node", "dialogue_manager_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Preguntar la bebida favorita", "ph": 1, "tz": "9", "br": "", "set": {}, "look": "g1", "point": "", "say": "¿Cuál es tu bebida favorita?", "reply": "Té.", "note": "", "why": "Es el segundo dato del invitado y se usa en las presentaciones (4×30).", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"], ["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Asociar la bebida a la persona", "ph": 1, "tz": "10", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "", "why": "Completa la ficha del invitado: nombre, bebida y atributo.", "teams": ["hri"], "msgs": [["/hri/remember", "service", "task_orchestrator_node", "dialogue_manager_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Pedir a la persona que lo acompañe", "ph": 1, "tz": "11", "br": "", "set": {"g1": "inside"}, "look": "g1", "point": "", "say": "Sígueme, te llevo a la sala.", "reply": "", "note": "", "why": "El invitado tiene que ir al living con el robot. Se lo pide con la voz antes de moverse.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["g1"]}, {"t": "Mirar en la dirección de movimiento", "ph": 1, "tz": "12", "br": "", "set": {}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "", "why": "Mirar hacia donde navega vale 2×15. Mirar fijo a otra parte o a gente que no corresponde resta puntos.", "teams": ["hri", "nav", "base"], "msgs": [["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Ir desde la entrada al living", "ph": 1, "tz": "13", "br": "", "set": {"robot": "seatView", "g1": "behind"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "Mirar fijo a otra parte o a gente que no corresponde durante la navegación resta puntos.", "why": "Llevar al invitado hasta la zona de asientos.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot", "g1"]}, {"t": "Detectar un asiento disponible", "ph": 1, "tz": "14", "br": "", "set": {}, "look": "S1", "point": "", "say": "", "reply": "", "note": "En la trazabilidad decía <code>/vision/persons?<\/code>. Se propone un servicio propio y el campo <code>posture<\/code> en cada persona.", "why": "Para ofrecer un asiento libre (2×100) hay que saber cuál está libre. Visión responde con <code>/vision/detect_free_seat<\/code> y usa la postura de cada persona.", "teams": ["vis", "hri"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "object_detector_node"], ["/vision/camera/depth", "topic", "camera_driver_node", "object_detector_node"], ["/vision/detect_free_seat", "service", "task_orchestrator_node", "object_detector_node"], ["/vision/persons", "topic", "person_detector_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Mirar a la persona", "ph": 1, "tz": "15", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "", "why": "Al ofrecer el asiento vuelve a hablarle al invitado, así que tiene que mirarlo.", "teams": ["vis", "nav", "hri", "base"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/gaze", "topic", "person_detector_node", "look_controller_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Ofrecer el asiento apuntándolo", "ph": 1, "tz": "16", "br": "", "set": {"g1": "S1"}, "look": "S1", "point": "S1", "say": "Charlie, puedes sentarte en el sofá, aquí.", "reply": "", "note": "", "why": "El reglamento pide indicar claramente el asiento. Señalar con el brazo (<code>/arm/point_to<\/code>) mientras lo dice es lo más claro.", "teams": ["hri", "arm"], "msgs": [["/arm/point_to", "action", "task_orchestrator_node", "arm_controller_node"], ["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["g1"]}, {"t": "Solo hay un invitado sentado", "ph": 1, "tz": "17a", "br": "", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "Escenario alternativo de la trazabilidad: falta el segundo invitado, así que el robot vuelve a esperar.", "why": "Escenario de la trazabilidad: con un invitado listo, el robot vuelve a esperar al segundo.", "teams": ["vis", "hri"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/persons", "topic", "person_detector_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Volver al punto de inicio", "ph": 1, "tz": "17a.1", "br": "", "set": {"robot": "start"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "", "why": "El timbre del invitado 2 solo suena si el robot está esperando en la posición inicial.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Rama A · Suena el timbre otra vez", "ph": 2, "tz": "1A", "br": "timbre", "set": {"g2": "outside", "bag": "g2", "door": "closed"}, "look": "", "point": "", "say": "", "reply": "", "note": "Llega el segundo invitado, con un bolso. <code>doorbell_detector_node<\/code> publica <code>/hri/doorbell_detected<\/code> y el robot sale hacia la puerta. La rama se decide otra vez para cada invitado: el invitado 1 pudo entrar por el botón y el 2 por el timbre.", "why": "Es el mismo mecanismo del invitado 1 y suma otros 30. La rama se decide de nuevo para cada invitado.", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"], ["/hri/doorbell_detected", "topic", "doorbell_detector_node", "task_orchestrator_node"]], "bell": true, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Rama B · Llega el botón", "ph": 2, "tz": "1B", "br": "boton", "set": {"g2": "outside", "bag": "g2", "door": "closed"}, "look": "", "point": "", "say": "", "reply": "", "note": "No se detectó el timbre del segundo invitado y se presiona el botón: <code>/base/start_button<\/code>. El robot va a la puerta y el resto del invitado 2 se puntúa igual.", "why": "Respaldo si el timbre del segundo invitado no se detectó.", "teams": ["base", "hri"], "msgs": [["/base/start_button", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": false, "button": true, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Rama C · No llega ninguno", "ph": 2, "tz": "1C", "br": "ninguno", "set": {"g2": "outside", "bag": "g2", "door": "closed"}, "look": "", "point": "", "say": "", "reply": "", "note": "Ni timbre ni botón dentro del tiempo límite: el robot va a la puerta solo a buscar al segundo invitado.", "why": "Pasado el tiempo límite, el robot va solo a buscar al invitado 2.", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"]], "bell": false, "button": false, "wait": true, "start": false, "both": false, "moves": []}, {"t": "Rama D · Llegan los dos", "ph": 2, "tz": "1D", "br": "dos", "set": {"g2": "outside", "bag": "g2", "door": "closed"}, "look": "", "point": "", "say": "", "reply": "", "note": "Igual que con el invitado 1: manda el primero que llega y el segundo solo se registra.", "why": "Lo primero que llega decide; lo otro se registra.", "teams": ["hri", "base"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "doorbell_detector_node"], ["/hri/doorbell_detected", "topic", "doorbell_detector_node", "task_orchestrator_node"], ["/base/start_button", "topic", "start_sound_node", "task_orchestrator_node"]], "bell": true, "button": false, "wait": false, "start": false, "both": true, "moves": []}, {"t": "Ir a la entrada", "ph": 2, "tz": "2", "br": "", "set": {"robot": "doorIn"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "Las tres ramas del invitado 2 se unen aquí.", "why": "Mismo recorrido del invitado 1, con 2×15 si mira hacia adelante.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Revisar la puerta y abrirla otra vez", "ph": 2, "tz": "nuevo", "br": "", "set": {"door": "open"}, "look": "door", "point": "", "say": "", "reply": "", "note": "", "why": "Abrir la puerta también vale 200 con el segundo invitado.", "teams": ["nav", "hri", "arm", "vis", "base"], "msgs": [["/nav/scan", "topic", "nav_drivers", "door_detector_node"], ["/nav/detect_door", "service", "task_orchestrator_node", "door_detector_node"], ["/arm/move_to_pose", "action", "task_orchestrator_node", "arm_controller_node"], ["/vision/gripper_camera/color", "topic", "camera_driver_node", "object_detector_node"], ["/vision/gripper_camera/depth", "topic", "camera_driver_node", "object_detector_node"], ["/vision/detect_handle", "service", "task_orchestrator_node", "object_detector_node"], ["/arm/open_door", "action", "task_orchestrator_node", "arm_controller_node"], ["/vision/gripper_objects", "topic", "object_detector_node", "arm_controller_node"], ["plan de agarre", "internal", "arm_controller_node", "grasp_planner_node"], ["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Detectar y mirar al invitado 2", "ph": 2, "tz": "3–4", "br": "", "set": {}, "look": "g2", "point": "", "say": "", "reply": "", "note": "", "why": "Mirar al que habla vuelve a valer 50.", "teams": ["vis", "hri", "nav", "base"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/persons", "topic", "person_detector_node", "task_orchestrator_node"], ["/vision/gaze", "topic", "person_detector_node", "look_controller_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Saludar y preguntar nombre y bebida", "ph": 2, "tz": "5–10", "br": "", "set": {}, "look": "g2", "point": "", "say": "¡Hola! ¿Cómo te llamas y cuál es tu bebida favorita?", "reply": "Robin, y me gusta la leche.", "note": "", "why": "Mismos datos que con el invitado 1. Aquí se ven juntos para acortar la animación.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"], ["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"], ["/hri/remember", "service", "task_orchestrator_node", "dialogue_manager_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Contarle al invitado 2 cómo es el invitado 1", "ph": 2, "tz": "nuevo", "br": "", "set": {}, "look": "g2", "point": "", "say": "En la sala te espera Charlie: lleva una camisa roja.", "reply": "", "note": "No estaba en la trazabilidad, pero el puntaje lo pide. El atributo se obtuvo en el paso 7 con <code>/vision/describe_person<\/code>.", "why": "Decir un atributo visual correcto del invitado 1 suma 4×20. Si es incorrecto, resta 4×20.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Pedir que lo acompañe y llevarlo al living", "ph": 2, "tz": "11–13", "br": "", "set": {"robot": "seatView", "g2": "behind"}, "look": "ahead", "point": "", "say": "Sígueme, por favor.", "reply": "", "note": "", "why": "Igual que con el invitado 1.", "teams": ["hri", "nav", "base"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot", "g2"]}, {"t": "Detectar un asiento libre y ofrecerlo señalándolo", "ph": 2, "tz": "14–16", "br": "", "set": {"g2": "C1"}, "look": "C1", "point": "C1", "say": "Robin, puedes sentarte en esa silla.", "reply": "", "note": "", "why": "Otro asiento libre para el invitado 2 (2×100).", "teams": ["hri", "vis", "nav", "arm"], "msgs": [["/vision/detect_free_seat", "service", "task_orchestrator_node", "object_detector_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/arm/point_to", "action", "task_orchestrator_node", "arm_controller_node"], ["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["g2"]}, {"t": "Hay dos invitados sentados", "ph": 3, "tz": "17", "br": "", "set": {}, "look": "", "point": "", "say": "", "reply": "", "note": "Los dos con <code>posture = sitting<\/code>. Ojo: después de sentarse pueden cambiarse de asiento.", "why": "Con los dos sentados empiezan las presentaciones.", "teams": ["vis", "hri"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/persons", "topic", "person_detector_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Mirar a la persona 1", "ph": 3, "tz": "18", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "", "why": "Mirar al invitado correcto mientras le habla del otro vale 2×50.", "teams": ["vis", "nav", "hri", "base"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/gaze", "topic", "person_detector_node", "look_controller_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Reconocer a la persona 1", "ph": 3, "tz": "19", "br": "", "set": {}, "look": "g1", "point": "", "say": "", "reply": "", "note": "Se identifica antes de hablar porque los invitados pudieron cambiarse de puesto. Respuesta de ejemplo: \"Charlie\", confianza 0,93.", "why": "Confirmar quién es antes de hablarle, porque pudo cambiarse de puesto.", "teams": ["hri", "vis"], "msgs": [["/vision/identify_person", "service", "task_orchestrator_node", "face_recognition_node"], ["/vision/faces", "topic", "face_recognition_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Presentarle la persona 2 a la persona 1", "ph": 3, "tz": "20", "br": "", "set": {}, "look": "g1", "point": "", "say": "Charlie, te presento a Robin. Su bebida favorita es la leche.", "reply": "", "note": "", "why": "Decir el nombre y la bebida del otro invitado suma 4×30.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Mirar a la persona 2", "ph": 3, "tz": "21", "br": "", "set": {}, "look": "g2", "point": "", "say": "", "reply": "", "note": "", "why": "Lo mismo hacia el otro lado.", "teams": ["vis", "nav", "hri", "base"], "msgs": [["/vision/camera/color", "topic", "camera_driver_node", "person_detector_node"], ["/vision/gaze", "topic", "person_detector_node", "look_controller_node"], ["/nav/look", "action", "task_orchestrator_node", "look_controller_node"], ["/nav/cmd_vel_look", "topic", "look_controller_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Reconocer a la persona 2", "ph": 3, "tz": "22", "br": "", "set": {}, "look": "g2", "point": "", "say": "", "reply": "", "note": "", "why": "Confirmar la identidad del segundo invitado.", "teams": ["hri", "vis"], "msgs": [["/vision/identify_person", "service", "task_orchestrator_node", "face_recognition_node"], ["/vision/faces", "topic", "face_recognition_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Presentarle la persona 1 a la persona 2", "ph": 3, "tz": "23", "br": "", "set": {}, "look": "g2", "point": "", "say": "Robin, él es Charlie. Su bebida favorita es el té.", "reply": "", "note": "", "why": "Cierra las presentaciones (4×30).", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Preguntar si tiene un bolso que desea guardar", "ph": 4, "tz": "24", "br": "", "set": {}, "look": "g2", "point": "", "say": "Robin, ¿quieres que guarde tu bolso?", "reply": "Sí, gracias.", "note": "", "why": "El invitado 2 trae un bolso para el anfitrión. El robot pregunta y Visión confirma dónde está el bolso.", "teams": ["hri", "vis"], "msgs": [["/vision/detect_bag", "service", "task_orchestrator_node", "object_detector_node"], ["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"], ["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Recibir el bolso por handover", "ph": 4, "tz": "25", "br": "", "set": {"robot": "nearG2", "bag": "robot"}, "look": "g2", "point": "", "say": "Estoy listo para recibir el bolso.", "reply": "", "note": "La garra queda quieta a menos de 10 cm de la mano, la luz y la voz avisan que está lista y la persona completa la entrega. Pedir ayuda resta 25; que lo pongan sobre el robot, 50; contar \"3, 2, 1\" en voz alta también se penaliza.", "why": "Recibirlo de la mano vale 50. El robot tiene que mostrar claramente que está listo: garra quieta a menos de 10 cm de la mano, luces y voz.", "teams": ["hri", "arm", "base"], "msgs": [["/arm/pick_object", "action", "task_orchestrator_node", "arm_controller_node"], ["/base/set_led_state", "service", "arm_controller_node", "led_node"], ["/arm/gripper_state", "topic", "gripper_controller_node", "handover_detector_node"], ["/arm/detect_handover", "service", "arm_controller_node", "handover_detector_node"], ["abrir / cerrar", "internal", "arm_controller_node", "gripper_controller_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Ir donde el anfitrión", "ph": 4, "tz": "26", "br": "", "set": {"robot": "hostPoint"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "", "why": "El robot tiene que contarle al anfitrión que tiene un bolso y pedirle indicaciones.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}, {"t": "Preguntarle al anfitrión dónde dejar el bolso", "ph": 4, "tz": "27", "br": "", "set": {}, "look": "host", "point": "", "say": "Tengo el bolso de Robin. ¿Dónde lo dejo?", "reply": "", "note": "", "why": "El reglamento pide que el robot informe y pida ayuda al anfitrión.", "teams": ["hri"], "msgs": [["/hri/converse", "action", "task_orchestrator_node", "dialogue_manager_node"], ["/hri/say", "topic", "dialogue_manager_node", "tts_node"], ["/hri/play_sound", "service", "tts_node", "speaker_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Escuchar las instrucciones del anfitrión", "ph": 4, "tz": "28", "br": "", "set": {"host": "hostStand"}, "look": "host", "point": "", "say": "", "reply": "Sígueme, te muestro.", "note": "Cuando el robot se lo pide, el anfitrión se para frente a él; el robot avisa cuando está listo para seguirlo.", "why": "El anfitrión dice \"Sígueme\" y el robot se prepara.", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["host"]}, {"t": "Seguir al anfitrión", "ph": 4, "tz": "29", "br": "", "set": {"robot": "kitchenRobot", "host": "hostKitchen"}, "look": "host", "point": "", "say": "", "reply": "", "note": "Restan: soltar el bolso (−50), perderlo y redescubrirlo (−50), pedirle que espere (−50), que lo lleve de la mano (−150).", "why": "Es el ítem más grande de la fase final: 200 puntos.", "teams": ["hri", "nav", "vis", "base"], "msgs": [["/nav/follow_person", "action", "task_orchestrator_node", "person_follower_node"], ["/vision/persons", "topic", "person_detector_node", "person_follower_node"], ["/nav/pose", "topic", "localization_node", "person_follower_node"], ["metas de seguimiento", "internal", "person_follower_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot", "host"]}, {"t": "Escuchar las instrucciones del anfitrión", "ph": 4, "tz": "30", "br": "", "set": {}, "look": "host", "point": "", "say": "", "reply": "Déjalo aquí, en el piso.", "note": "", "why": "El anfitrión indica \"Déjalo aquí, en el piso\".", "teams": ["hri"], "msgs": [["/hri/audio", "topic", "audio_capture_node", "asr_node"], ["/hri/speech_text", "topic", "asr_node", "dialogue_manager_node"], ["/hri/dialogue_state", "topic", "dialogue_manager_node", "task_orchestrator_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Dejar el bolso", "ph": 4, "tz": "31", "br": "", "set": {"bag": "bagDrop"}, "look": "drop", "point": "", "say": "", "reply": "", "note": "", "why": "Dejarlo en el lugar correcto vale 50.", "teams": ["hri", "arm"], "msgs": [["/arm/place_object", "action", "task_orchestrator_node", "arm_controller_node"], ["plan de agarre", "internal", "arm_controller_node", "grasp_planner_node"], ["abrir / cerrar", "internal", "arm_controller_node", "gripper_controller_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": []}, {"t": "Volver al punto de inicio", "ph": 4, "tz": "32", "br": "", "set": {"robot": "start"}, "look": "ahead", "point": "", "say": "", "reply": "", "note": "Fin del intento: 1450 puntos posibles y un límite de 7:00 minutos.", "why": "Termina el intento. Total posible: 1450 puntos en 7:00.", "teams": ["hri", "nav", "base", "vis"], "msgs": [["/nav/navigate_to_pose", "action", "task_orchestrator_node", "path_planner_node"], ["/nav/look_ahead", "service", "task_orchestrator_node", "look_controller_node"], ["/nav/scan", "topic", "nav_drivers", "localization_node"], ["/base/wheel_odom", "topic", "base_driver_node", "odom_ekf_node"], ["/base/odom", "topic", "odom_ekf_node", "localization_node"], ["/nav/map", "topic", "localization_node", "path_planner_node"], ["/vision/objects", "topic", "object_detector_node", "path_planner_node"], ["/nav/cmd_vel_planner", "topic", "path_planner_node", "cmd_vel_mux"], ["/nav/cmd_vel_mux", "topic", "cmd_vel_mux", "safety_filter_node"], ["/cmd_vel", "topic", "safety_filter_node", "base_driver_node"]], "bell": false, "button": false, "wait": false, "start": false, "both": false, "moves": ["robot"]}]};
+var $ = function(id){ return document.getElementById(id); };
+if (location.protocol === 'file:' || /github\.io$/.test(location.hostname)) $('back').hidden = false;
+if (!window.THREE || !THREE.OrbitControls){ $('err').hidden = false; }
+
+/* ---------- arena (plano 2026, en metros: x hacia la derecha, z hacia abajo del plano) ---------- */
+var POS = {outside:[-0.8,1.38], door:[0,1.38], doorIn:[0.8,1.38], inside:[0.42,2.0], start:[2.0,5.6], seatView:[2.3,6.0], behind:[1.65,5.25],
+  S1:[1.55,7.32], S2:[2.45,7.32], C1:[3.3,6.45], C2:[7.0,6.6], hostStand:[2.6,6.7], hostPoint:[2.65,6.0], nearG2:[3.0,5.85],
+  kitchenRobot:[5.8,2.25], hostKitchen:[6.7,1.9], bagDrop:[6.45,2.3]};
+var SEATS = {S1:[1.55,6.0], S2:[2.45,6.0], C1:[2.0,7.2]}; /* hacia dónde mira quien se sienta */
+var ROOMC = {OUT:[-1,1.4], TL:[2,1.7], TR:[6,1.7], BL:[2,5.7], BR:[6,5.7]};
+var DOORS = [['OUT','TL',[0,1.38],'x'],['TL','TR',[4,0.72],'x'],['TL','BL',[2.66,3.4],'z'],['TR','BR',[6.83,3.4],'z'],['BL','BR',[4,5.57],'x']];
+function room(p){ if (p[0] < 0) return 'OUT'; var t = p[1] < 3.4, l = p[0] < 4; return t ? (l ? 'TL' : 'TR') : (l ? 'BL' : 'BR'); }
+function route(a, b){
+  var ra = room(a), rb = room(b); if (ra === rb) return [a, b];
+  var prev = {}; prev[ra] = null; var q = [ra];
+  while (q.length){ var r = q.shift(); if (r === rb) break; DOORS.forEach(function(d){ var o = d[0] === r ? d[1] : d[1] === r ? d[0] : null; if (o && !(o in prev)){ prev[o] = [r, d]; q.push(o); } }); }
+  var chain = []; var cur = rb; while (prev[cur]){ chain.unshift([prev[cur][0], cur, prev[cur][1]]); cur = prev[cur][0]; }
+  var pts = [a];
+  chain.forEach(function(c){ var d = c[2], p = d[2], ax = d[3] === 'x' ? 0 : 1, from = ROOMC[c[0]][ax] < p[ax] ? -1 : 1, off = 0.5;
+    var bef = p.slice(), aft = p.slice(); bef[ax] += from * off; aft[ax] -= from * off; pts.push(bef, aft); });
+  pts.push(b); return pts;
+}
+function plen(pts){ var L = 0; for (var i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]); return L; }
+function along(pts, t){
+  var L = plen(pts) * t; for (var i = 1; i < pts.length; i++){ var s = Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+    if (L <= s || i === pts.length - 1){ var k = s ? Math.min(1, L / s) : 1; return [pts[i-1][0] + (pts[i][0] - pts[i-1][0]) * k, pts[i-1][1] + (pts[i][1] - pts[i-1][1]) * k, Math.atan2(pts[i][1] - pts[i-1][1], pts[i][0] - pts[i-1][0])]; } L -= s; }
+  return [pts[0][0], pts[0][1], 0];
+}
+
+/* ---------- pasos ---------- */
+var STEPS = DATA.steps, PHASES = DATA.phases, TEAMS = DATA.teams, BRN = DATA.br;
+var STATES = []; (function(){ var st = {}; STEPS.forEach(function(s){ st = Object.assign({}, st, s.set); STATES.push(st); }); })();
+var BRANCH = 'timbre', cur = 0, playing = false, timer = null, speed = 1, TAB = 'why';
+function vis(i){ var s = STEPS[i]; return !s.br || s.br === BRANCH; }
+function stepFrom(i, d){ var j = i; while (j >= 0 && j < STEPS.length && !vis(j)) j += d; return (j < 0 || j >= STEPS.length) ? -1 : j; }
+
+/* ---------- three.js ---------- */
+var ok = !!(window.THREE && THREE.OrbitControls);
+var css = function(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; };
+var scene, camera, renderer, controls, MAT = {}, ENT = {}, lidarLines, gaze, ring, bubble, bubbleH, robotKind = 'milo', camMode = 'general', showLidar = false, showGaze = true;
+var BLOCK = []; /* obstáculos que ve el LiDAR (rectángulos en planta) */
+function mat(c, o){ return new THREE.MeshStandardMaterial(Object.assign({color:c, roughness:.85, metalness:0}, o || {})); }
+function box(w, h, d, m, x, y, z){ var g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); g.position.set(x, y, z); g.castShadow = true; g.receiveShadow = true; return g; }
+function cyl(r, h, m, x, y, z, seg){ var g = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 24), m); g.position.set(x, y, z); g.castShadow = true; return g; }
+function label(text, col){
+  var cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = 256; cv.height = 64;
+  ctx.font = '600 30px Archivo, Arial, sans-serif'; var w = ctx.measureText(text).width + 28;
+  ctx.fillStyle = 'rgba(20,22,28,.82)'; roundRect(ctx, (256 - w) / 2, 8, w, 46, 12); ctx.fill();
+  ctx.fillStyle = col || '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 128, 32);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), depthTest:false})); sp.scale.set(1.0, .25, 1); sp.renderOrder = 10; return sp;
+}
+function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function bubbleSprite(text, who){
+  var cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = 640; cv.height = 220;
+  ctx.font = '500 30px Archivo, Arial, sans-serif';
+  var words = text.split(' '), lines = [], ln = '';
+  words.forEach(function(w){ var t = ln ? ln + ' ' + w : w; if (ctx.measureText(t).width > 560){ lines.push(ln); ln = w; } else ln = t; }); if (ln) lines.push(ln); lines = lines.slice(0, 4);
+  var h = 36 + lines.length * 38;
+  ctx.fillStyle = 'rgba(255,255,255,.96)'; roundRect(ctx, 10, 10, 620, h, 22); ctx.fill();
+  ctx.strokeStyle = who === 'robot' ? '#6a2c9e' : '#1b84b8'; ctx.lineWidth = 5; ctx.stroke();
+  ctx.fillStyle = '#15171c'; lines.forEach(function(l, i){ ctx.fillText(l, 34, 52 + i * 38); });
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), depthTest:false})); sp.scale.set(2.2, .756, 1); sp.renderOrder = 12; sp.center.set(.5, 0); return sp;
+}
+
+function buildScene(){
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(42, 1, .1, 100);
+  renderer = new THREE.WebGLRenderer({canvas:$('c'), antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.maxPolarAngle = Math.PI * .48; controls.minDistance = 2; controls.maxDistance = 30;
+  controls.addEventListener('start', function(){ if (camMode === 'follow') setCam('general', true); });
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8170, .75));
+  var sun = new THREE.DirectionalLight(0xffffff, .65); sun.position.set(-4, 12, 3); sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024); var sc = sun.shadow.camera; sc.left = -7; sc.right = 7; sc.top = 7; sc.bottom = -7; sun.target.position.set(4, 0, 4);
+  scene.add(sun, sun.target);
+  MAT.floor = mat(0); MAT.out = mat(0); MAT.wall = mat(0); MAT.furn = mat(0); MAT.dark = mat(0); MAT.wood = mat(0);
+  MAT.green = mat(0x5f8f4e); MAT.skin = mat(0xd9b38c); MAT.leg = mat(0x30333b); MAT.metal = mat(0x9aa0aa, {metalness:.4, roughness:.5});
+  applyTheme();
+  var fl = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), MAT.floor); fl.rotation.x = -Math.PI / 2; fl.position.set(4, 0, 4); fl.receiveShadow = true; scene.add(fl);
+  var po = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.2), MAT.out); po.rotation.x = -Math.PI / 2; po.position.set(-1.2, -.005, 1.6); po.receiveShadow = true; scene.add(po);
+  /* paredes: [x1,z1,x2,z2] con huecos */
+  var H = .9, T = .12;
+  function wall(x1, z1, x2, z2){ var w = Math.max(Math.abs(x2 - x1), T), d = Math.max(Math.abs(z2 - z1), T); scene.add(box(w, H, d, MAT.wall, (x1 + x2) / 2, H / 2, (z1 + z2) / 2)); BLOCK.push([Math.min(x1, x2) - T / 2, Math.min(z1, z2) - T / 2, Math.max(x1, x2) + T / 2, Math.max(z1, z2) + T / 2]); }
+  wall(0, 0, 8, 0); wall(0, 8, 8, 8); wall(8, 0, 8, 8);
+  wall(0, 0, 0, .93); wall(0, 1.83, 0, 4.75); wall(0, 5.52, 0, 8);
+  wall(4, 0, 4, .32); wall(4, 1.12, 4, 3.4); wall(4, 3.4, 4, 5.17); wall(4, 5.97, 4, 8);
+  wall(0, 3.4, 2.26, 3.4); wall(3.06, 3.4, 4, 3.4); wall(4, 3.4, 6.43, 3.4); wall(7.23, 3.4, 8, 3.4);
+  /* puerta de entrada (bisagra en z = 0.93, abre hacia afuera) y puerta lateral cerrada */
+  ENT.door = new THREE.Group(); ENT.door.position.set(0, 0, .93);
+  var leaf = box(.05, H * 1.15, .9, MAT.wood, 0, H * 1.15 / 2, .45); ENT.door.add(leaf);
+  var knob = new THREE.Mesh(new THREE.SphereGeometry(.035, 12, 8), MAT.metal); knob.position.set(.05, .5, .8); ENT.door.add(knob);
+  scene.add(ENT.door); ENT.doorBlock = [-.06, .93, .06, 1.83];
+  var side = box(.05, H * 1.15, .77, MAT.wood, 0, H * 1.15 / 2, 5.135); scene.add(side); BLOCK.push([-.06, 4.75, .06, 5.52]);
+  /* muebles: [x, z, w, d, h, material, ¿lo ve el LiDAR?] */
+  function f(x, z, w, d, h, m, lid){ scene.add(box(w, h, d, m, x, h / 2, z)); if (lid) BLOCK.push([x - w / 2, z - d / 2, x + w / 2, z + d / 2]); }
+  /* entrada / estudio */
+  f(1.31, .46, 1.26, .53, .75, MAT.dark, false); f(1.07, .95, .38, .38, .45, MAT.furn, false); f(1.61, .95, .38, .38, .45, MAT.furn, false);
+  f(2.6, .48, .62, .5, .55, MAT.furn, true); f(.92, 3.08, 1.06, .25, .45, MAT.furn, true);
+  scene.add(cyl(.13, .45, MAT.metal, 1.8, .225, 3.12)); BLOCK.push([1.67, 2.99, 1.93, 3.25]);
+  /* dormitorio */
+  f(4.96, 2.9, 1.7, .87, .5, MAT.furn, true); f(4.4, 2.13, .45, .4, .5, MAT.dark, true); f(7.57, .48, .35, .39, .6, MAT.wood, true);
+  /* living */
+  f(2.0, 7.62, 1.9, .3, .85, MAT.furn, true); f(2.0, 7.3, 1.9, .5, .42, MAT.furn, true); f(1.11, 7.35, .2, .8, .6, MAT.furn, true); f(2.89, 7.35, .2, .8, .6, MAT.furn, true);
+  f(3.53, 7.43, .5, .45, .45, MAT.dark, false); f(1.28, 3.63, 1.12, .3, .9, MAT.wood, true);
+  f(3.3, 6.75, .5, .12, .8, MAT.dark, true); f(3.3, 6.5, .5, .5, .45, MAT.dark, false); /* silla agregada por los árbitros */
+  /* cocina y comedor */
+  scene.add(cyl(.55, .04, MAT.wood, 5.91, .74, 5.42)); scene.add(cyl(.06, .72, MAT.dark, 5.91, .36, 5.42));
+  [[5.91, 4.75], [5.91, 6.09], [5.24, 5.42], [6.58, 5.42]].forEach(function(c){ f(c[0], c[1], .38, .38, .45, MAT.dark, false); });
+  f(5.15, 7.53, 1.5, .4, .9, MAT.dark, true); f(6.78, 7.53, .58, .4, .9, MAT.furn, true); f(4.3, 4.19, .3, 1.0, 1.1, MAT.furn, true); f(7.62, 4.2, .52, .77, .9, MAT.metal, true);
+  scene.add(cyl(.12, .4, MAT.metal, 7.55, .2, 5.0));
+  /* plantas */
+  [[7.55, 3.06], [.56, 7.4]].forEach(function(p){ scene.add(cyl(.12, .3, MAT.dark, p[0], .15, p[1])); var s = new THREE.Mesh(new THREE.SphereGeometry(.22, 14, 10), MAT.green); s.position.set(p[0], .45, p[1]); s.castShadow = true; scene.add(s); BLOCK.push([p[0] - .14, p[1] - .14, p[0] + .14, p[1] + .14]); });
+  /* rótulos de las habitaciones */
+  [['Entrada', 2.0, 2.2], ['Dormitorio', 6.0, 1.3], ['Living', 1.0, 4.5], ['Cocina y comedor', 6.0, 6.6], ['Afuera', -1.2, .3]].forEach(function(r){ var l = label(r[0], '#e8e4da'); l.position.set(r[1], .05, r[2]); l.scale.set(1.2, .3, 1); l.material.opacity = .8; scene.add(l); });
+  /* zona base */
+  var zb = new THREE.Mesh(new THREE.RingGeometry(.42, .48, 40), new THREE.MeshBasicMaterial({color:0x6a2c9e, transparent:true, opacity:.65, side:THREE.DoubleSide}));
+  zb.rotation.x = -Math.PI / 2; zb.position.set(POS.start[0], .01, POS.start[1]); scene.add(zb); ENT.zone = zb;
+  var zl = label('Zona base', '#e8d9f7'); zl.position.set(POS.start[0], .06, POS.start[1] + .72); zl.scale.set(.9, .22, 1); scene.add(zl);
+  /* timbre */
+  ring = new THREE.Mesh(new THREE.TorusGeometry(.35, .03, 8, 40), new THREE.MeshBasicMaterial({color:0xe6a74a, transparent:true, opacity:.9}));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(-.4, .6, 1.38); ring.visible = false; scene.add(ring);
+  /* gente, robot, bolso */
+  ENT.g1 = person(0x2f7fd1, 'Charlie'); ENT.g2 = person(0x2f9e6a, 'Robin'); ENT.host = person(0xd07a2a, 'Anfitrión'); ENT.pass = person(0x8d93a1, 'Otra persona');
+  place(ENT.pass, POS.C2, Math.PI);
+  ENT.bag = box(.3, .32, .14, mat(0x7a3e2b), 0, 0, 0); scene.add(ENT.bag);
+  buildRobot();
+  gaze = new THREE.Mesh(new THREE.ConeGeometry(.75, 2.4, 28, 1, true), new THREE.MeshBasicMaterial({color:0x6a2c9e, transparent:true, opacity:.12, side:THREE.DoubleSide, depthWrite:false}));
+  gaze.geometry.translate(0, -1.2, 0); gaze.geometry.rotateZ(Math.PI / 2); scene.add(gaze);
+  lidarLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0x1b84b8, transparent:true, opacity:.55}));
+  lidarLines.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(180 * 6), 3)); lidarLines.visible = false; scene.add(lidarLines);
+}
+function applyTheme(){
+  if (!scene) return;
+  scene.background = new THREE.Color(css('--scene-bg'));
+  MAT.floor.color.set(css('--floor')); MAT.out.color.set(css('--outside')); MAT.wall.color.set(css('--wall'));
+  MAT.furn.color.set(css('--furn')); MAT.dark.color.set(css('--furn-dark')); MAT.wood.color.set(css('--wood'));
+}
+function person(col, name){
+  var g = new THREE.Group(), m = mat(col);
+  var legs = cyl(.13, .8, MAT.leg, 0, .4, 0, 16); var body = cyl(.19, .62, m, 0, 1.1, 0, 20);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(.13, 18, 14), MAT.skin); head.position.set(0, 1.58, 0); head.castShadow = true;
+  var nose = new THREE.Mesh(new THREE.SphereGeometry(.03, 8, 6), MAT.skin); nose.position.set(.13, 1.58, 0);
+  g.add(legs, body, head, nose); g.legs = legs;
+  var l = label(name); l.position.set(0, 1.98, 0); g.add(l); g.lab = l;
+  g.children.forEach(function(c){ c.userData.y0 = c.position.y; });
+  g.userData = {pos:[0, 0], yaw:0, sit:false}; scene.add(g); return g;
+}
+function place(g, p, yaw, sit){
+  g.position.set(p[0], 0, p[1]); g.rotation.y = -(yaw || 0); g.userData.pos = [p[0], p[1]]; g.userData.yaw = yaw || 0;
+  var s = !!sit; g.userData.sit = s; g.legs.visible = !s; g.children.forEach(function(c){ if (c !== g.legs) c.position.y = c.userData.y0 - (s ? .45 : 0); });
+}
+function buildRobot(){
+  if (ENT.robot){ scene.remove(ENT.robot); }
+  var R = new THREE.Group(), brand = mat(0x6a2c9e, {roughness:.6}), white = mat(0xf2f2f4, {roughness:.5}), dark = mat(0x2a2c33);
+  if (robotKind === 'milo'){
+    R.add(box(.62, .2, .46, white, .05, .18, 0));
+    [-1, 1].forEach(function(s){ var w = cyl(.0825, .045, dark, 0, .0825, s * .2, 20); w.rotation.x = Math.PI / 2; R.add(w); });
+    var cs = new THREE.Mesh(new THREE.SphereGeometry(.05, 10, 8), dark); cs.position.set(.33, .05, 0); R.add(cs);
+  } else {
+    R.add(box(.6, .2, .6, white, 0, .2, 0));
+    [[.24, .24], [.24, -.24], [-.24, .24], [-.24, -.24]].forEach(function(c){ var w = cyl(.07, .06, dark, c[0], .07, c[1] + (c[1] > 0 ? .04 : -.04), 16); w.rotation.x = Math.PI / 2; R.add(w);
+      for (var k = 0; k < 6; k++){ var rr = box(.025, .025, .07, mat(0x8a8f9c), c[0] + Math.cos(k) * .07, .07 + Math.sin(k) * .07, c[1] + (c[1] > 0 ? .04 : -.04)); R.add(rr); } });
+  }
+  var lidar = cyl(.04, .05, dark, .25, .32, 0, 16); R.add(lidar);
+  R.add(box(.08, 1.0, .08, white, -.05, .78, 0));
+  var led = new THREE.Mesh(new THREE.TorusGeometry(.075, .02, 8, 24), new THREE.MeshBasicMaterial({color:0xbb8ff0})); led.rotation.x = Math.PI / 2; led.position.set(-.05, .95, 0); R.add(led); R.led = led;
+  var head = box(.2, .17, .24, brand, -.02, 1.38, 0); R.add(head);
+  var cam = cyl(.035, .03, dark, .085, 1.4, 0, 14); cam.rotation.z = Math.PI / 2; R.add(cam);
+  if (robotKind === 'martha'){ var cam2 = cyl(.025, .03, dark, .085, 1.4, .07, 12); cam2.rotation.z = Math.PI / 2; R.add(cam2); }
+  /* brazo con ascensor */
+  var lift = new THREE.Group(); lift.position.set(.0, .9, 0); R.add(lift); R.lift = lift;
+  var sh = new THREE.Group(); lift.add(sh); R.sh = sh;
+  var up = box(.34, .05, .05, mat(0xb35a10), .17, 0, 0); sh.add(up);
+  var el = new THREE.Group(); el.position.set(.34, 0, 0); sh.add(el); R.el = el;
+  el.add(box(.3, .04, .04, mat(0xb35a10), .15, 0, 0));
+  var grip = new THREE.Group(); grip.position.set(.3, 0, 0); el.add(grip); R.grip = grip;
+  grip.add(box(.03, .04, .1, dark, 0, 0, 0)); grip.add(box(.07, .015, .015, dark, .04, 0, .04)); grip.add(box(.07, .015, .015, dark, .04, 0, -.04));
+  var gc = cyl(.018, .03, mat(0x0e7f78), .0, .03, 0, 10); grip.add(gc);
+  var name = label(robotKind === 'milo' ? 'MILO' : 'MARTHA', '#e8d9f7'); name.position.set(0, 1.78, 0); R.add(name);
+  R.traverse(function(o){ if (o.isMesh) o.castShadow = true; });
+  R.userData = {pos:(ENT.robot ? ENT.robot.userData.pos : POS.doorIn).slice(), yaw:ENT.robot ? ENT.robot.userData.yaw : 0};
+  R.position.set(R.userData.pos[0], 0, R.userData.pos[1]); R.rotation.y = -R.userData.yaw;
+  ENT.robot = R; scene.add(R); armPose('rest', null, true);
+}
+/* poses del brazo */
+var arm = {sh:[0, -1.2], el:-.6, lift:.9}, armT = {sh:[0, -1.2], el:-.6, lift:.9};
+function armPose(kind, target, now){
+  if (kind === 'point' && target){ var r = ENT.robot.userData, ang = Math.atan2(target[1] - r.pos[1], target[0] - r.pos[0]) - r.yaw; armT = {sh:[-ang, -.15], el:0, lift:1.0}; }
+  else if (kind === 'door'){ armT = {sh:[0, .15], el:-.1, lift:.95}; }
+  else if (kind === 'hand'){ armT = {sh:[-.5, -.35], el:.0, lift:.85}; }
+  else if (kind === 'carry'){ armT = {sh:[0, -.6], el:.6, lift:.75}; }
+  else armT = {sh:[0, -1.2], el:-.6, lift:.9};
+  if (now) arm = JSON.parse(JSON.stringify(armT));
+}
+function applyArm(){
+  var R = ENT.robot; if (!R) return;
+  R.lift.position.y = arm.lift; R.sh.rotation.set(0, arm.sh[0], arm.sh[1]); R.el.rotation.z = arm.el;
+}
+
+/* ---------- estado y animación ---------- */
+var anims = [], lookAt = null, stepT0 = 0, stepDurMs = 3000, curStep = null;
+function targetOf(key){ if (!key || key === 'ahead') return null; if (key === 'drop') return POS.bagDrop; if (POS[key]) return POS[key]; var e = ENT[key]; return e && e.visible !== false ? e.userData.pos : null; }
+function personYaw(g){ var r = ENT.robot.userData.pos, p = g.userData.pos; return Math.atan2(r[1] - p[1], r[0] - p[0]); }
+function stateFor(i){ return STATES[i]; }
+function setEntityInstant(i){
+  var st = stateFor(i);
+  ['g1', 'g2', 'host'].forEach(function(k){ var g = ENT[k], key = st[k]; if (!key){ g.visible = false; return; } g.visible = true; var p = POS[key];
+    place(g, p, SEATS[key] ? Math.atan2(SEATS[key][1] - p[1], SEATS[key][0] - p[0]) : (g.userData.yaw || 0), !!SEATS[key]); });
+  var rp = POS[st.robot || 'doorIn']; ENT.robot.userData.pos = rp.slice(); ENT.robot.position.set(rp[0], 0, rp[1]);
+  ENT.door.rotation.y = st.door === 'open' ? -Math.PI / 2 : 0;
+}
+function go(i, animate){
+  i = Math.max(0, Math.min(STEPS.length - 1, i));
+  if (STEPS[i].br && STEPS[i].br !== BRANCH) setBranch(STEPS[i].br, false);
+  cur = i; var s = STEPS[i], prev = i > 0 ? stateFor(i - 1) : stateFor(0), st = stateFor(i);
+  renderSide(i);
+  if (!ok) return;
+  anims = [];
+  if (!animate){ setEntityInstant(i); }
+  else {
+    setEntityInstant(Math.max(0, i - 1));
+    if (i === 0) setEntityInstant(0);
+  }
+  var dur = 2600;
+  ['robot', 'g1', 'g2', 'host'].forEach(function(k){
+    var a = prev[k], b = st[k]; if (k === 'robot'){ a = a || 'doorIn'; b = b || 'doorIn'; }
+    if (!animate || !a || !b || a === b || !POS[a] || !POS[b]) return;
+    var pts = route(POS[a], POS[b]); var d = plen(pts) * 1100 + 600; dur = Math.max(dur, d + 900);
+    anims.push({k:k, pts:pts, dur:d, delay:(k === 'robot' && st.host === 'hostKitchen' && prev.host !== 'hostKitchen') ? 700 : 0, seatKey:b});
+  });
+  if (animate && st.door !== prev.door) anims.push({k:'door', from:prev.door === 'open' ? -Math.PI / 2 : 0, to:st.door === 'open' ? -Math.PI / 2 : 0, dur:1500, delay:400});
+  stepDurMs = dur; stepT0 = performance.now(); curStep = s;
+  lookAt = s.look || null;
+  ring.visible = !!(s.bell || s.both);
+  ENT.robot.led.material.color.set(s.wait ? 0x55b9e8 : (s.t.indexOf('handover') >= 0 ? 0x5cc47f : (s.start || s.button ? 0x5cc47f : 0xbb8ff0)));
+  if (s.point === 'door') armPose('door'); else if (s.point) armPose('point', POS[s.point]);
+  else if (/handover/i.test(s.t)) armPose('hand'); else if (st.bag === 'robot') armPose('carry'); else if (/Abrir la puerta|abrirla/.test(s.t)) armPose('door'); else armPose('rest');
+  if (bubble){ scene.remove(bubble); bubble = null; } if (bubbleH){ scene.remove(bubbleH); bubbleH = null; }
+  if (s.say){ bubble = bubbleSprite(s.say, 'robot'); scene.add(bubble); }
+  if (s.reply){ bubbleH = bubbleSprite(s.reply, 'human'); bubbleH.userData.who = s.look === 'host' ? 'host' : (s.look === 'g2' ? 'g2' : 'g1'); scene.add(bubbleH); }
+  updateBag(st);
+}
+function updateBag(st){
+  var b = st.bag; ENT.bag.visible = !!b; ENT.bag.userData.mode = b;
+}
+var ease = function(t){ return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+function angLerp(a, b, t){ var d = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI; return a + d * t; }
+function tick(now){
+  requestAnimationFrame(tick);
+  if (!ok) return;
+  var el = (now - stepT0) * speed;
+  anims.forEach(function(a){
+    var t = Math.max(0, Math.min(1, (el - a.delay) / a.dur)), e = ease(t);
+    if (a.k === 'door'){ ENT.door.rotation.y = a.from + (a.to - a.from) * e; return; }
+    var g = ENT[a.k], p = along(a.pts, e);
+    g.userData.pos = [p[0], p[1]]; g.position.set(p[0], 0, p[1]);
+    if (t < 1){ g.userData.yaw = angLerp(g.userData.yaw, p[2], .2); g.rotation.y = -g.userData.yaw; if (a.k !== 'robot' && g.userData.sit) place(g, [p[0], p[1]], g.userData.yaw, false); }
+    else if (a.k !== 'robot' && SEATS[a.seatKey] && !g.userData.sit){ var sp = POS[a.seatKey]; place(g, sp, Math.atan2(SEATS[a.seatKey][1] - sp[1], SEATS[a.seatKey][0] - sp[0]), true); }
+  });
+  var moving = anims.some(function(a){ return a.k === 'robot' && (el - a.delay) < a.dur; });
+  /* el robot mira girando toda la base */
+  var R = ENT.robot, tgt = targetOf(lookAt);
+  if (!moving && tgt && lookAt !== 'ahead'){ var want = Math.atan2(tgt[1] - R.userData.pos[1], tgt[0] - R.userData.pos[0]); R.userData.yaw = angLerp(R.userData.yaw, want, .08); R.rotation.y = -R.userData.yaw; }
+  /* las personas de pie miran al robot cuando conversan */
+  ['g1', 'g2', 'host'].forEach(function(k){ var g = ENT[k]; if (!g.visible || g.userData.sit) return; var busy = anims.some(function(a){ return a.k === k && (el - a.delay) < a.dur; }); if (busy) return;
+    if (lookAt === k || (curStep && curStep.reply && lookAt === k)){ g.userData.yaw = angLerp(g.userData.yaw, personYaw(g), .08); g.rotation.y = -g.userData.yaw; } });
+  /* brazo */
+  var k = .08; arm.sh[0] += (armT.sh[0] - arm.sh[0]) * k; arm.sh[1] += (armT.sh[1] - arm.sh[1]) * k; arm.el += (armT.el - arm.el) * k; arm.lift += (armT.lift - arm.lift) * k; applyArm();
+  /* bolso */
+  var m = ENT.bag.userData.mode;
+  if (m === 'g2'){ var g2 = ENT.g2, y = g2.userData.yaw; ENT.bag.position.set(g2.position.x + Math.cos(y + 1.3) * .28, g2.userData.sit ? .3 : .75, g2.position.z + Math.sin(y + 1.3) * .28); ENT.bag.rotation.y = -y; }
+  else if (m === 'robot'){ var gp = new THREE.Vector3(); R.grip.getWorldPosition(gp); ENT.bag.position.set(gp.x, gp.y - .2, gp.z); ENT.bag.rotation.y = R.rotation.y; }
+  else if (m && POS[m]){ ENT.bag.position.set(POS[m][0], .16, POS[m][1]); }
+  /* mirada, burbujas, timbre */
+  gaze.visible = showGaze; gaze.position.set(R.position.x + Math.cos(R.userData.yaw) * .08, 1.4, R.position.z + Math.sin(R.userData.yaw) * .08); gaze.rotation.set(0, -R.userData.yaw, -.12);
+  if (bubble) bubble.position.set(R.position.x, 1.95, R.position.z);
+  if (bubbleH){ var w = ENT[bubbleH.userData.who]; if (w) bubbleH.position.set(w.position.x, w.userData.sit ? 1.65 : 2.1, w.position.z); }
+  if (ring.visible){ var ph = (now / 600) % 1; ring.scale.setScalar(1 + ph * .8); ring.material.opacity = .9 * (1 - ph); }
+  if (curStep && curStep.wait){ R.led.material.color.setHSL(.55, .7, .55 + .15 * Math.sin(now / 250)); }
+  if (showLidar) updateLidar();
+  if (camMode === 'follow'){ var off = new THREE.Vector3(-Math.cos(R.userData.yaw) * 3.2, 2.6, -Math.sin(R.userData.yaw) * 3.2); camera.position.lerp(new THREE.Vector3(R.position.x, 0, R.position.z).add(off), .06); controls.target.lerp(new THREE.Vector3(R.position.x, .8, R.position.z), .1); }
+  controls.update(); renderer.render(scene, camera);
+}
+/* LiDAR 2D: 180 rayos a 0,36 m de altura contra paredes, muebles altos y personas */
+function updateLidar(){
+  var R = ENT.robot, ox = R.position.x + Math.cos(R.userData.yaw) * .25, oz = R.position.z + Math.sin(R.userData.yaw) * .25, arr = lidarLines.geometry.attributes.position.array;
+  var boxes = BLOCK.slice(); if (Math.abs(ENT.door.rotation.y) < .2) boxes.push(ENT.doorBlock);
+  ['g1', 'g2', 'host', 'pass'].forEach(function(k){ var g = ENT[k]; if (g.visible && !g.userData.sit){ boxes.push([g.position.x - .14, g.position.z - .14, g.position.x + .14, g.position.z + .14]); } });
+  for (var i = 0; i < 180; i++){
+    var a = i / 180 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a), best = 8;
+    boxes.forEach(function(b){ var t1 = (b[0] - ox) / dx, t2 = (b[2] - ox) / dx, t3 = (b[1] - oz) / dz, t4 = (b[3] - oz) / dz;
+      var tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4)), tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
+      if (tmax >= 0 && tmin <= tmax && tmin > .05 && tmin < best) best = tmin; });
+    arr.set([ox, .36, oz, ox + dx * best, .36, oz + dz * best], i * 6);
+  }
+  lidarLines.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ---------- cámara ---------- */
+function setCam(m, keep){
+  camMode = m;
+  document.querySelectorAll('[data-cam]').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-cam') === m); });
+  if (keep || !ok) return;
+  var v = $('view'), asp = v.clientWidth / Math.max(1, v.clientHeight), f = asp < .8 ? 1.3 : asp < 1.3 ? 1.15 : 1;
+  if (m === 'general'){ camera.position.set(3.6 + (-6.8) * f, 8.5 * f, 4.2 + 7.3 * f); controls.target.set(3.6, 0, 4.2); }
+  if (m === 'top'){ camera.position.set(3.6, 13.5 * f, 4.21); controls.target.set(3.6, 0, 4.2); }
+}
+function resize(){
+  if (!ok) return; var v = $('view'), w = v.clientWidth, h = v.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+
+/* ---------- panel ---------- */
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function renderSide(i){
+  var s = STEPS[i], visCount = 0, visIdx = 0; for (var k = 0; k < STEPS.length; k++){ if (vis(k)){ visCount++; if (k <= i) visIdx = visCount; } }
+  var h = '<div class="meta"><span class="ph">' + esc(PHASES[s.ph]) + '</span><span>Paso ' + esc(s.tz) + '</span>' + (s.br ? '<span class="brtag">Rama ' + esc(BRN[s.br]) + '</span>' : '') + '<span class="n">' + visIdx + ' / ' + visCount + '</span></div>';
+  h += '<h2>' + esc(s.t) + '</h2>';
+  h += '<div class="chips">' + s.teams.map(function(t){ return '<span class="chip team-' + t + '"><span class="dot"></span>' + esc(TEAMS[t]) + '</span>'; }).join('') + '</div>';
+  if (s.say || s.reply) h += '<div class="speech">' + (s.say ? '<p class="r"><b>Robot</b>' + esc(s.say) + '</p>' : '') + (s.reply ? '<p class="h"><b>' + (s.look === 'host' ? 'Anfitrión' : 'Invitado') + '</b>' + esc(s.reply) + '</p>' : '') + '</div>';
+  if (s.note) h += '<p class="note">' + s.note + '</p>';
+  h += '<div class="tabs" role="tablist"><button type="button" role="tab" data-tab="why" aria-selected="' + (TAB === 'why') + '">Por qué</button><button type="button" role="tab" data-tab="msgs" aria-selected="' + (TAB === 'msgs') + '">Mensajes (' + s.msgs.length + ')</button></div>';
+  if (TAB === 'why') h += '<p class="why">' + (s.why || '—') + '</p>';
+  else h += '<ul class="msgs">' + s.msgs.map(function(m){ var kw = {topic:'tópico', service:'servicio', action:'acción', internal:'interno'}[m[1]] || m[1]; return '<li><span class="kind ' + m[1] + '">' + kw + '</span><code>' + esc(m[0]) + '</code><span class="fl">' + esc(m[2]) + ' → ' + esc(m[3]) + '</span></li>'; }).join('') + '</ul>';
+  $('side').innerHTML = h;
+  $('side').querySelectorAll('[data-tab]').forEach(function(b){ b.addEventListener('click', function(){ TAB = b.getAttribute('data-tab'); renderSide(cur); }); });
+  $('scrub').value = i; $('scrubOut').textContent = visIdx + ' / ' + visCount;
+  Array.prototype.forEach.call($('phases').children, function(b, k){ b.classList.toggle('on', s.ph === k); });
+}
+function setBranch(b, keep){
+  BRANCH = b;
+  $('branch').querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-br') === b); });
+  if (keep && STEPS[cur].br && STEPS[cur].br !== b){ var ph = STEPS[cur].ph, j = STEPS.findIndex(function(s){ return s.ph === ph && s.br === b; }); if (j >= 0) go(j, false); }
+  else if (keep) renderSide(cur);
+}
+function setPlaying(v){
+  playing = v; $('play').textContent = v ? 'Pausa' : 'Reproducir'; $('play').setAttribute('aria-pressed', v); clearTimeout(timer);
+  if (v){ if (cur >= STEPS.length - 1) go(0, false); loop(true); }
+}
+function loop(first){
+  if (!playing) return;
+  var n = first ? cur : stepFrom(cur + 1, 1); if (n < 0){ setPlaying(false); return; }
+  go(n, true); timer = setTimeout(function(){ loop(false); }, Math.max(2600, stepDurMs + 600) / speed);
+}
+
+/* ---------- inicio ---------- */
+PHASES.forEach(function(p, k){ var b = document.createElement('button'); b.type = 'button'; b.textContent = p; b.addEventListener('click', function(){ setPlaying(false); go(stepFrom(STEPS.findIndex(function(s){ return s.ph === k; }), 1), false); }); $('phases').appendChild(b); });
+[['timbre', 'A · Timbre'], ['boton', 'B · Botón'], ['ninguno', 'C · Ninguno'], ['dos', 'D · Los dos']].forEach(function(o){ var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-br', o[0]); b.setAttribute('aria-pressed', o[0] === BRANCH); b.textContent = o[1]; b.addEventListener('click', function(){ setBranch(o[0], true); }); $('branch').appendChild(b); });
+$('scrub').max = STEPS.length - 1;
+$('scrub').addEventListener('input', function(){ setPlaying(false); go(+this.value, false); });
+$('prev').addEventListener('click', function(){ setPlaying(false); var j = stepFrom(cur - 1, -1); if (j >= 0) go(j, false); });
+$('next').addEventListener('click', function(){ setPlaying(false); var j = stepFrom(cur + 1, 1); if (j >= 0) go(j, true); });
+$('play').addEventListener('click', function(){ setPlaying(!playing); });
+$('speed').addEventListener('change', function(){ speed = +this.value; });
+document.addEventListener('keydown', function(e){ var t = (e.target.tagName || '').toLowerCase(); if (t === 'input' || t === 'select' || t === 'button') return;
+  if (e.key === 'ArrowRight'){ setPlaying(false); var j = stepFrom(cur + 1, 1); if (j >= 0) go(j, true); } if (e.key === 'ArrowLeft'){ setPlaying(false); var j2 = stepFrom(cur - 1, -1); if (j2 >= 0) go(j2, false); } });
+document.querySelectorAll('[data-cam]').forEach(function(b){ b.addEventListener('click', function(){ setCam(b.getAttribute('data-cam')); }); });
+$('tLidar').addEventListener('click', function(){ showLidar = !showLidar; this.setAttribute('aria-pressed', showLidar); if (lidarLines) lidarLines.visible = showLidar; });
+$('tGaze').addEventListener('click', function(){ showGaze = !showGaze; this.setAttribute('aria-pressed', showGaze); });
+function setRobot(k){ robotKind = k; $('rMilo').setAttribute('aria-pressed', k === 'milo'); $('rMartha').setAttribute('aria-pressed', k === 'martha'); if (ok){ buildRobot(); go(cur, false); } }
+$('rMilo').addEventListener('click', function(){ setRobot('milo'); });
+$('rMartha').addEventListener('click', function(){ setRobot('martha'); });
+if (ok){
+  try {
+    buildScene(); resize(); setCam('general');
+    window.addEventListener('resize', resize);
+    if (window.ResizeObserver) new ResizeObserver(resize).observe($('view'));
+    var mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', applyTheme);
+    new MutationObserver(applyTheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+    requestAnimationFrame(tick);
+  } catch (e){ ok = false; $('err').hidden = false; console.error(e); }
+}
+go(0, false);
+})();
+</script>
+
+</body>
+</html>
